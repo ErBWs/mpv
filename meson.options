@@ -37,6 +37,7 @@ option('vector', type: 'feature', value: 'auto', description: 'GCC vector instru
 option('win32-threads', type: 'feature', value: 'auto', description: 'win32 native threading')
 option('zimg', type: 'feature', value: 'auto', description: 'libzimg support (high quality software scaler)')
 option('zlib', type: 'feature', value: 'auto', description: 'zlib')
+option('ohos', type: 'feature', value: 'disabled', description: 'System is HarmonyOS')
 
 # audio output features
 option('alsa', type: 'feature', value: 'auto', description: 'ALSA audio output')

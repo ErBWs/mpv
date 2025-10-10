@@ -315,10 +315,12 @@ endif
 darwin = host_machine.system() == 'darwin'
 win32 = host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
 posix = not win32
+ohos = get_option('ohos').enabled()
 
 features += {'darwin': darwin}
 features += {'posix': posix}
 features += {'dos-paths': win32, 'win32': win32}
+features += {'ohos': ohos}
 
 mswin_flags = ['-D_WIN32_WINNT=0x0A00', '-DWINVER=0x0A00', '-DUNICODE',
                '-DCOBJMACROS', '-DINITGUID', '-DNOMINMAX',
@@ -1216,10 +1218,16 @@ if features['egl-android']
     sources += files('video/out/opengl/context_android.c')
 endif
 
-egl_ohos = cc.find_library('EGL', required: get_option('egl-ohos'))
-features += {'egl': egl_ohos.found() and gl_allowed}
-if features['egl']
-    dependencies += egl
+egl_ohos_opt = get_option('egl-ohos').require(
+    features['ohos'] and gl_allowed,
+    error_message: 'the OS is not HarmonyOS!',
+)
+egl_ohos = cc.find_library('EGL', required: egl_ohos_opt)
+features += {'egl-ohos': egl_ohos.found()}
+if features['egl-ohos']
+    dependencies += egl_ohos
+    features += {'gl': true}
+    sources += files('video/out/opengl/context_android.c')
 endif
 
 egl_drm = get_option('egl-drm').require(
