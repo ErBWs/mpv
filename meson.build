@@ -856,6 +856,13 @@ if features['opensles']
     sources += files('audio/out/ao_opensles.c')
 endif
 
+ohaudio = cc.find_library('ohaudio', required: get_option('ohaudio'))
+features += {'ohaudio': ohaudio.found()}
+if features['ohaudio']
+    dependencies += ohaudio
+    sources += files('audio/out/ao_ohaudio.c')
+endif
+
 oss_opt = get_option('oss-audio').require(
     get_option('gpl'),
     error_message: 'the build is not GPL!',
@@ -1207,6 +1214,12 @@ if features['egl-android']
     dependencies += egl_android
     features += {'gl': true}
     sources += files('video/out/opengl/context_android.c')
+endif
+
+egl_ohos = cc.find_library('EGL', required: get_option('egl-ohos'))
+features += {'egl': egl_ohos.found() and gl_allowed}
+if features['egl']
+    dependencies += egl
 endif
 
 egl_drm = get_option('egl-drm').require(
