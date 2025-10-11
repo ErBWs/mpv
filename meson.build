@@ -464,6 +464,7 @@ endif
 
 features += {'android': host_machine.system() == 'android'}
 if features['android']
+    dependencies += cc.find_library('android')
     sources += files('audio/out/ao_audiotrack.c',
                      'misc/jni.c',
                      'osdep/android/strnlen.c',
