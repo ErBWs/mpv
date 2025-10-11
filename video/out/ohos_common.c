@@ -1,8 +1,6 @@
 /*
  * This file is part of mpv.
  *
- * Copyright (C) 2025 Bao Han <erbws@foxmail.com>
- *
  * mpv is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -17,82 +15,73 @@
  * License along with mpv.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libavcodec/jni.h>
-#include <android/native_window_jni.h>
-
-#include "android_common.h"
+#include "ohos_common.h"
 #include "common/msg.h"
-#include "misc/jni.h"
 #include "options/m_config.h"
 #include "vo.h"
 
-struct vo_android_state {
+struct vo_ohos_state {
     struct mp_log *log;
-    ANativeWindow *native_window;
+    OHNativeWindow *native_window;
 };
 
-bool vo_android_init(struct vo *vo)
+bool vo_ohos_init(struct vo *vo)
 {
-    vo->android = talloc_zero(vo, struct vo_android_state);
-    struct vo_android_state *ctx = vo->android;
+    vo->ohos = talloc_zero(vo, struct vo_ohos_state);
+    struct vo_ohos_state *ctx = vo->ohos;
 
-    *ctx = (struct vo_android_state){
-        .log = mp_log_new(ctx, vo->log, "android"),
+    *ctx = (struct vo_ohos_state){
+        .log = mp_log_new(ctx, vo->log, "ohos"),
     };
-
-    JNIEnv *env = MP_JNI_GET_ENV(ctx);
-    if (!env) {
-        MP_FATAL(ctx, "Could not attach java VM.\n");
-        goto fail;
-    }
 
     if (vo->opts->WinID == 0 || vo->opts->WinID == -1) {
         MP_FATAL(ctx, "Missing surface pointer\n");
         goto fail;
     }
-    jobject surface = (jobject)(intptr_t)vo->opts->WinID;
-    ctx->native_window = ANativeWindow_fromSurface(env, surface);
+
+    uint64_t surface = 0;
+    // uint64 -> int64 -> uint64 evil hack.
+    memcpy(&surface, &vo->opts->WinID, sizeof(vo->opts->WinID));
+    OH_NativeWindow_CreateNativeWindowFromSurfaceId(surface, &ctx->native_window);
     if (!ctx->native_window) {
-        MP_FATAL(ctx, "Failed to create ANativeWindow\n");
+        MP_FATAL(ctx, "Failed to create OHNativeWindow\n");
         goto fail;
     }
 
     return true;
 fail:
     talloc_free(ctx);
-    vo->android = NULL;
+    vo->ohos = NULL;
     return false;
 }
 
-void vo_android_uninit(struct vo *vo)
+void vo_ohos_uninit(struct vo *vo)
 {
-    struct vo_android_state *ctx = vo->android;
+    struct vo_ohos_state *ctx = vo->ohos;
     if (!ctx)
         return;
 
     if (ctx->native_window)
-        ANativeWindow_release(ctx->native_window);
+        OH_NativeWindow_DestroyNativeWindow(ctx->native_window);
 
     talloc_free(ctx);
-    vo->android = NULL;
+    vo->ohos = NULL;
 }
 
-ANativeWindow *vo_android_native_window(struct vo *vo)
+OHNativeWindow *vo_ohos_native_window(struct vo *vo)
 {
-    struct vo_android_state *ctx = vo->android;
+    struct vo_ohos_state *ctx = vo->ohos;
     return ctx->native_window;
 }
 
-bool vo_android_surface_size(struct vo *vo, int *out_w, int *out_h)
+bool vo_ohos_surface_size(struct vo *vo, int *out_w, int *out_h)
 {
-    struct vo_android_state *ctx = vo->android;
+    struct vo_ohos_state *ctx = vo->ohos;
 
-    int w = vo->opts->android_surface_size.w,
-        h = vo->opts->android_surface_size.h;
-    if (!w)
-        w = ANativeWindow_getWidth(ctx->native_window);
-    if (!h)
-        h = ANativeWindow_getHeight(ctx->native_window);
+    int w = vo->opts->ohos_surface_size.w,
+        h = vo->opts->ohos_surface_size.h;
+    if (!w || !h)
+        OH_NativeWindow_NativeWindowHandleOpt(ctx->native_window, GET_BUFFER_GEOMETRY, &h, &w);
 
     if (w <= 0 || h <= 0) {
         MP_ERR(ctx, "Failed to get height and width.\n");

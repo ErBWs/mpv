@@ -1,8 +1,6 @@
 /*
  * This file is part of mpv.
  *
- * Copyright (C) 2025 Bao Han <erbws@foxmail.com>
- *
  * mpv is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -71,10 +69,8 @@ static bool ohos_init(struct ra_ctx *ctx)
     if (!mpegl_create_context(ctx, p->egl_display, &p->egl_context, &config))
         goto fail;
 
-    ANativeWindow *native_window = vo_ohos_native_window(ctx->vo);
-    EGLint format;
-    eglGetConfigAttrib(p->egl_display, config, EGL_NATIVE_VISUAL_ID, &format);
-    ANativeWindow_setBuffersGeometry(native_window, 0, 0, format);
+    OHNativeWindow *native_window = vo_ohos_native_window(ctx->vo);
+    OH_NativeWindow_NativeWindowHandleOpt(native_window, SET_BUFFER_GEOMETRY, 0, 0);
 
     p->egl_surface = eglCreateWindowSurface(p->egl_display, config,
                                     (EGLNativeWindowType)native_window, NULL);

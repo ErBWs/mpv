@@ -1,8 +1,6 @@
 /*
  * This file is part of mpv.
  *
- * Copyright (C) 2025 Bao Han <erbws@foxmail.com>
- *
  * mpv is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -19,13 +17,13 @@
 
 #pragma once
 
-#include <android/native_window_jni.h>
+#include <native_window/external_window.h>
 
 #include "common/common.h"
 
 struct vo;
 
-bool vo_android_init(struct vo *vo);
-void vo_android_uninit(struct vo *vo);
-ANativeWindow *vo_android_native_window(struct vo *vo);
-bool vo_android_surface_size(struct vo *vo, int *w, int *h);
+bool vo_ohos_init(struct vo *vo);
+void vo_ohos_uninit(struct vo *vo);
+OHNativeWindow *vo_ohos_native_window(struct vo *vo);
+bool vo_ohos_surface_size(struct vo *vo, int *w, int *h);

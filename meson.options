@@ -47,7 +47,6 @@ option('avfoundation', type: 'feature', value: 'auto', description: 'AVFoundatio
 option('jack', type: 'feature', value: 'auto', description: 'JACK audio output')
 option('openal', type: 'feature', value: 'disabled', description: 'OpenAL audio output')
 option('opensles', type: 'feature', value: 'auto', description: 'OpenSL ES audio output')
-option('ohaudio', type: 'feature', value: 'auto', description: 'OHAudio audio output')
 option('oss-audio', type: 'feature', value: 'auto', description: 'OSSv4 audio output')
 option('pipewire', type: 'feature', value: 'auto', description: 'PipeWire audio output')
 option('pulse', type: 'feature', value: 'auto', description: 'PulseAudio audio output')

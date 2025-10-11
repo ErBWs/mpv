@@ -271,6 +271,7 @@ enum mp_imgfmt {
     IMGFMT_DXVA2,           // IDirect3DSurface9 (NV12/P010/P016)
     IMGFMT_MMAL,            // MMAL_BUFFER_HEADER_T
     IMGFMT_MEDIACODEC,      // AVMediaCodecBuffer
+    IMGFMT_OHCODEC,         // OHCodecBuffer
     IMGFMT_CUDA,            // CUDA Buffer
 
     // Not an actual format; base for mpv-specific descriptor table.

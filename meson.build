@@ -315,12 +315,10 @@ endif
 darwin = host_machine.system() == 'darwin'
 win32 = host_machine.system() == 'cygwin' or host_machine.system() == 'windows'
 posix = not win32
-ohos = get_option('ohos').enabled()
 
 features += {'darwin': darwin}
 features += {'posix': posix}
 features += {'dos-paths': win32, 'win32': win32}
-features += {'ohos': ohos}
 
 mswin_flags = ['-D_WIN32_WINNT=0x0A00', '-DWINVER=0x0A00', '-DUNICODE',
                '-DCOBJMACROS', '-DINITGUID', '-DNOMINMAX',
@@ -466,12 +464,18 @@ endif
 
 features += {'android': host_machine.system() == 'android'}
 if features['android']
-    dependencies += cc.find_library('android')
     sources += files('audio/out/ao_audiotrack.c',
                      'misc/jni.c',
                      'osdep/android/strnlen.c',
                      'video/out/android_common.c',
                      'video/out/vo_mediacodec_embed.c')
+endif
+
+features += {'ohos': get_option('ohos').enabled()}
+if features['ohos']
+    sources += files('audio/out/ao_ohaudio.c',
+                     'video/out/ohos_common.c',
+                     'video/out/vo_ohcodec.c')
 endif
 
 uwp_opt = get_option('uwp').require(
@@ -858,13 +862,6 @@ if features['opensles']
     sources += files('audio/out/ao_opensles.c')
 endif
 
-ohaudio = cc.find_library('ohaudio', required: get_option('ohaudio'))
-features += {'ohaudio': ohaudio.found()}
-if features['ohaudio']
-    dependencies += ohaudio
-    sources += files('audio/out/ao_ohaudio.c')
-endif
-
 oss_opt = get_option('oss-audio').require(
     get_option('gpl'),
     error_message: 'the build is not GPL!',
@@ -1227,7 +1224,7 @@ features += {'egl-ohos': egl_ohos.found()}
 if features['egl-ohos']
     dependencies += egl_ohos
     features += {'gl': true}
-    sources += files('video/out/opengl/context_android.c')
+    sources += files('video/out/opengl/context_ohos.c')
 endif
 
 egl_drm = get_option('egl-drm').require(
