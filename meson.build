@@ -474,6 +474,13 @@ endif
 
 features += {'ohos': get_option('ohos').enabled()}
 if features['ohos']
+    dependencies += [cc.find_library('ohaudio'),
+                     cc.find_library('z'),
+                     cc.find_library('native_media_vdec'),
+                     cc.find_library('native_media_codecbase'),
+                     cc.find_library('native_media_core'),
+                     cc.find_library('native_window'),
+                     cc.find_library('c')]
     sources += files('audio/out/ao_ohaudio.c',
                      'video/out/ohos_common.c',
                      'video/out/vo_ohcodec.c')
@@ -1268,7 +1275,7 @@ if plain_gl.allowed()
     features += {'gl': true}
 endif
 
-if features['egl'] or features['egl-android'] or features['egl-angle-win32']
+if features['egl'] or features['egl-android'] or features['egl-angle-win32'] or features['egl-ohos']
     sources += files('video/out/opengl/egl_helpers.c')
 endif
 

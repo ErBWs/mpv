@@ -42,6 +42,7 @@ bool vo_ohos_init(struct vo *vo)
     uint64_t surface = 0;
     // uint64 -> int64 -> uint64 evil hack.
     memcpy(&surface, &vo->opts->WinID, sizeof(vo->opts->WinID));
+    MP_VERBOSE(ctx, "surface id: %ld\n", surface);
     OH_NativeWindow_CreateNativeWindowFromSurfaceId(surface, &ctx->native_window);
     if (!ctx->native_window) {
         MP_FATAL(ctx, "Failed to create OHNativeWindow\n");
@@ -89,5 +90,6 @@ bool vo_ohos_surface_size(struct vo *vo, int *out_w, int *out_h)
     }
     *out_w = w;
     *out_h = h;
+    MP_VERBOSE(ctx, "get height and width success: %dx%d\n", w, h);
     return true;
 }
