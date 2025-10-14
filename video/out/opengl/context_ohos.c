@@ -66,20 +66,8 @@ static bool ohos_init(struct ra_ctx *ctx)
     }
 
     EGLConfig config;
-    EGLint numConfigs;
-
-    EGLint attribs[] = {
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 8,
-        EGL_GREEN_SIZE, 8,
-        EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_NONE
-    };
-    if (!eglChooseConfig(p->egl_display, attribs, &config, 1, &numConfigs)) {
-        MP_FATAL(ctx, "Failed to choose egl config!\n");
-    }
+    if (!mpegl_create_context(ctx, p->egl_display, &p->egl_context, &config))
+        goto fail;
 
     OHNativeWindow *native_window = vo_ohos_native_window(ctx->vo);
     p->egl_surface = eglCreateWindowSurface(p->egl_display, config,
@@ -89,13 +77,6 @@ static bool ohos_init(struct ra_ctx *ctx)
         MP_FATAL(ctx, "Could not create EGL surface!\n");
         goto fail;
     }
-
-    EGLint contextAttribs[] = {
-        EGL_CONTEXT_CLIENT_VERSION, 3,
-        EGL_NONE
-    };
-
-    p->egl_context = eglCreateContext(p->egl_display, config, EGL_NO_CONTEXT, contextAttribs);
 
     if (!eglMakeCurrent(p->egl_display, p->egl_surface, p->egl_surface,
                         p->egl_context)) {
