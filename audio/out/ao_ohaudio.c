@@ -33,7 +33,9 @@
 struct priv {
     OH_AudioStreamBuilder* builder;
     OH_AudioRenderer *renderer;
-    int frame_size;
+    int64_t last_timestamp;
+    int64_t current_latency;
+    int64_t target_latency;
 
     int volume_mode;
 };
@@ -52,6 +54,9 @@ static void uninit(struct ao* ao)
         OH_AudioStreamBuilder_Destroy(p->builder);
         p->builder = NULL;
     }
+
+    p->last_timestamp = 0;
+    p->current_latency = p->target_latency;
 }
 
 static OH_AudioData_Callback_Result audio_on_write_callback(
@@ -61,12 +66,34 @@ static OH_AudioData_Callback_Result audio_on_write_callback(
     int32_t audioDataSize)
 {
     struct ao* ao = userData;
+    struct priv* p = ao->priv;
+
+    int64_t now = mp_time_ns();
+    int64_t frame, pos, timestamp;
+
+    // OH_AudioRenderer_GetAudioTimestampInfo() cannot be called too frequently
+    if (p->last_timestamp == 0 || now - p->last_timestamp > 500000000) {
+        OH_AudioRenderer_GetFramesWritten(renderer, &frame);
+        if (OH_AudioRenderer_GetAudioTimestampInfo(renderer, &pos, &timestamp) > 0)
+            pos = frame;
+        p->target_latency = frame - pos;
+        p->last_timestamp = now;
+    }
+
+    // Fix video freeze caused by sudden change of latency
+    if (p->target_latency - p->current_latency > 300)
+        p->current_latency += 300;
+    else if (p->current_latency - p->target_latency > 300)
+        p->current_latency -= 300;
+    else
+        p->current_latency = p->target_latency;
 
     int sample = audioDataSize / (ao->channels.num * af_fmt_to_bytes(ao->format));
-    double delay = sample / (double)ao->samplerate;
+    int64_t delay = MP_TIME_S_TO_NS(sample) / ao->samplerate;
+    delay += MP_TIME_S_TO_NS(p->current_latency) / ao->samplerate;
 
     ao_read_data(ao, &audioData, sample,
-        mp_time_ns() + MP_TIME_S_TO_NS(delay), NULL, true, true);
+        mp_time_ns() + delay, NULL, true, true);
 
     return AUDIO_DATA_CALLBACK_RESULT_VALID;
 }
@@ -118,9 +145,6 @@ static int init(struct ao* ao)
         OH_AudioStreamBuilder_SetSampleFormat(p->builder, AUDIOSTREAM_SAMPLE_S16LE);
         break;
     }
-
-    p->frame_size = ao->samplerate * ao->channels.num * af_fmt_to_bytes(ao->format) * 20 / 1000;
-    OH_AudioStreamBuilder_SetFrameSizeInCallback(p->builder, p->frame_size);
 
     OH_AudioRenderer_OnWriteDataCallback callback = audio_on_write_callback;
     OH_AudioStreamBuilder_SetRendererWriteDataCallback(p->builder, callback, ao);
@@ -209,6 +233,9 @@ const struct ao_driver audio_out_ohaudio = {
     .priv_size = sizeof(struct priv),
     .priv_defaults = &(const struct priv) {
         .volume_mode = AUDIOSTREAM_VOLUMEMODE_SYSTEM_GLOBAL,
+        .last_timestamp = 0,
+        .current_latency = 0,
+        .target_latency = 0,
     },
     .options = (const struct m_option[]) {
         {"volume-mode", OPT_INT(volume_mode),
