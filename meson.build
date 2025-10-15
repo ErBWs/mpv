@@ -475,12 +475,7 @@ endif
 features += {'ohos': get_option('ohos').enabled()}
 if features['ohos']
     dependencies += [cc.find_library('ohaudio'),
-                     cc.find_library('z'),
-                     cc.find_library('native_media_vdec'),
-                     cc.find_library('native_media_codecbase'),
-                     cc.find_library('native_media_core'),
-                     cc.find_library('native_window'),
-                     cc.find_library('c')]
+                     cc.find_library('native_window')]
     sources += files('audio/out/ao_ohaudio.c',
                      'video/out/ohos_common.c',
                      'video/out/vo_ohcodec.c')
@@ -984,7 +979,7 @@ if features['sdl2-video']
 endif
 
 shaderc = dependency('shaderc', required:
-    get_option('shaderc').require(features['win32-desktop']))
+    get_option('shaderc').require(features['win32-desktop'] or features['ohos']))
 features += {'shaderc': shaderc.found()}
 if features['shaderc']
     dependencies += shaderc
@@ -1328,6 +1323,10 @@ endif
 
 if features['vulkan'] and features['x11']
      sources += files('video/out/vulkan/context_xlib.c')
+endif
+
+if features['vulkan'] and features['ohos']
+     sources += files('video/out/vulkan/context_ohos.c')
 endif
 
 features += {'vk-khr-display': vulkan.type_name() == 'internal' or
