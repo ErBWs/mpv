@@ -475,9 +475,13 @@ endif
 features += {'ohos': get_option('ohos').enabled()}
 if features['ohos']
     dependencies += [cc.find_library('ohaudio'),
+                     cc.find_library('native_media_codecbase'),
+                     cc.find_library('native_media_core'),
+                     cc.find_library('native_media_vdec'),
                      cc.find_library('native_window')]
     sources += files('audio/out/ao_ohaudio.c',
                      'video/out/ohos_common.c',
+                     'video/out/hwdec/hwdec_ohcodec.c',
                      'video/out/vo_ohcodec.c')
 endif
 

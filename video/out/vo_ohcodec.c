@@ -17,6 +17,7 @@
 
 #include <libavutil/hwcontext.h>
 #include <libavutil/hwcontext_oh.h>
+#include <native_window/external_window.h>
 
 #include "common/common.h"
 #include "vo.h"
@@ -37,7 +38,9 @@ static AVBufferRef *create_ohcodec_device_ref(struct vo *vo)
     AVHWDeviceContext *ctx = (void *)device_ref->data;
     AVOHCodecDeviceContext *hwctx = ctx->hwctx;
     mp_assert(vo->opts->WinID != 0 && vo->opts->WinID != -1);
-    memcpy(hwctx->native_window, &vo->opts->WinID, sizeof(vo->opts->WinID));
+    uint64_t surface = 0;
+    memcpy(&surface, &vo->opts->WinID, sizeof(vo->opts->WinID));
+    OH_NativeWindow_CreateNativeWindowFromSurfaceId(surface, hwctx->native_window);
 
     if (av_hwdevice_ctx_init(device_ref) < 0)
         av_buffer_unref(&device_ref);
@@ -70,6 +73,8 @@ static void flip_page(struct vo *vo)
     if (!p->next_image)
         return;
 
+    AVFrame* frame = (AVFrame *)p->next_image->planes[3];
+    av_frame_unref(frame);
     mp_image_unrefp(&p->next_image);
 }
 
