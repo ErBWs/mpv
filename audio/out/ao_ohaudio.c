@@ -37,7 +37,7 @@ struct priv {
     int64_t current_latency;
     int64_t target_latency;
 
-    int volume_mode;
+    int encoding_type;
 };
 
 static void uninit(struct ao* ao)
@@ -115,8 +115,7 @@ static int init(struct ao* ao)
 
     OH_AudioStreamBuilder_SetChannelCount(p->builder, ao->channels.num);
     OH_AudioStreamBuilder_SetSamplingRate(p->builder, ao->samplerate);
-    OH_AudioStreamBuilder_SetVolumeMode(p->builder, p->volume_mode);
-    OH_AudioStreamBuilder_SetEncodingType(p->builder, AUDIOSTREAM_ENCODING_TYPE_RAW);
+    OH_AudioStreamBuilder_SetEncodingType(p->builder, p->encoding_type);
     OH_AudioStreamBuilder_SetRendererInfo(p->builder, AUDIOSTREAM_USAGE_MOVIE);
 
     if (af_fmt_is_int(ao->format)) {
@@ -232,14 +231,14 @@ const struct ao_driver audio_out_ohaudio = {
 
     .priv_size = sizeof(struct priv),
     .priv_defaults = &(const struct priv) {
-        .volume_mode = AUDIOSTREAM_VOLUMEMODE_SYSTEM_GLOBAL,
+        .encoding_type = AUDIOSTREAM_ENCODING_TYPE_RAW,
         .last_timestamp = 0,
         .current_latency = 0,
         .target_latency = 0,
     },
     .options = (const struct m_option[]) {
-        {"volume-mode", OPT_INT(volume_mode),
-            M_RANGE(0, 1)},
+        {"encoding_type", OPT_INT(encoding_type),
+            M_RANGE(0, 2)},
         {0}
     },
     .options_prefix = "ohaudio",
