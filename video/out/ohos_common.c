@@ -17,7 +17,6 @@
 
 #include "ohos_common.h"
 #include "common/msg.h"
-#include "options/m_config.h"
 #include "vo.h"
 
 struct vo_ohos_state {
@@ -40,7 +39,6 @@ bool vo_ohos_init(struct vo *vo)
     }
 
     uint64_t surface = 0;
-    // uint64 -> int64 -> uint64 evil hack.
     memcpy(&surface, &vo->opts->WinID, sizeof(vo->opts->WinID));
     OH_NativeWindow_CreateNativeWindowFromSurfaceId(surface, &ctx->native_window);
     if (!ctx->native_window) {
