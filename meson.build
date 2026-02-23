@@ -1233,7 +1233,8 @@ features += {'egl-ohos': egl_ohos.found()}
 if features['egl-ohos']
     dependencies += egl_ohos
     features += {'gl': true}
-    sources += files('video/out/opengl/context_ohos.c')
+    sources += files('video/out/opengl/context_ohos.c',
+                     'video/out/hwdec/hwdec_ohcodec_gl.c')
 endif
 
 egl_drm = get_option('egl-drm').require(
@@ -1332,7 +1333,8 @@ if features['vulkan'] and features['x11']
 endif
 
 if features['vulkan'] and features['ohos']
-     sources += files('video/out/vulkan/context_ohos.c')
+     sources += files('video/out/vulkan/context_ohos.c',
+                      'video/out/hwdec/hwdec_ohcodec_vk.c')
 endif
 
 features += {'vk-khr-display': vulkan.type_name() == 'internal' or
