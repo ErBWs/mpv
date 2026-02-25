@@ -25,21 +25,19 @@
 #include <native_buffer/native_buffer.h>
 
 #include "config.h"
+#include "hwdec_ohcodec.h"
 
 #include "video/out/gpu/hwdec.h"
 #include "video/out/ohos_common.h"
 #include "video/out/vulkan/context.h"
-#include "hwdec_ohcodec.h"
+#include "filters/filter.h"
 
-#include <EGL/egl.h>
-
-
-static const struct ohcodec_interop_fn *interop_fns[] = {
+static const ohcodec_interop_init interop_inits[] = {
 #if HAVE_VULKAN
-    &ohcodec_vk_fn,
+    ohcodec_interop_pl_init,
 #endif
 #if HAVE_GL
-    &ohcodec_gl_fn,
+    ohcodec_interop_gl_init,
 #endif
     NULL
 };
@@ -64,17 +62,13 @@ static int init(struct ra_hwdec *hw)
 {
     struct ohcodec_priv *p = hw->priv;
 
-    p->image = OH_NativeImage_Create(-1, GL_TEXTURE_EXTERNAL_OES);
-    mp_assert(p->image);
-
-    p->window = OH_NativeImage_AcquireNativeWindow(p->image);
+    p->window = vo_ohos_native_window(hw->ra_ctx->vo);
     mp_assert(p->window);
 
-    for (int i = 0; interop_fns[i]; i++) {
-        if (!interop_fns[i]->check(hw))
-            continue;
-
-        interop_fns[i]->init(hw);
+    for (int i = 0; interop_inits[i]; i++) {
+        if (interop_inits[i](hw)) {
+            break;
+        }
     }
 
     p->hwctx = (struct mp_hwdec_ctx){
@@ -97,10 +91,12 @@ static void uninit(struct ra_hwdec *hw)
 {
     struct ohcodec_priv *p = hw->priv;
 
-    if (p->image) {
-        OH_NativeImage_Destroy(&p->image);
-        p->window = NULL;
-    }
+    // if (p->image) {
+    //     OH_NativeImage_Destroy(&p->image);
+    //     p->window = NULL;
+    // }
+
+    p->window = NULL;
 
     hwdec_devices_remove(hw->devs, &p->hwctx);
     av_buffer_unref(&p->hwctx.av_device_ref);
@@ -110,11 +106,11 @@ static void image_callback(void *context)
 {
     struct ohcodec_mapper_priv *p = context;
 
-    mp_mutex_lock(&p->lock);
-    MP_VERBOSE(p, "received image\n");
-    p->image_available = true;
-    mp_cond_signal(&p->cond);
-    mp_mutex_unlock(&p->lock);
+    // mp_mutex_lock(&p->lock);
+    // MP_VERBOSE(p, "received image\n");
+    // p->image_available = true;
+    // mp_cond_signal(&p->cond);
+    // mp_mutex_unlock(&p->lock);
 }
 
 static int mapper_init(struct ra_hwdec_mapper *mapper)
@@ -123,20 +119,27 @@ static int mapper_init(struct ra_hwdec_mapper *mapper)
     struct ohcodec_priv *o = mapper->owner->priv;
 
     p->log = mapper->log;
-    mp_mutex_init(&p->lock);
-    mp_cond_init(&p->cond);
+    // mp_mutex_init(&p->lock);
+    // mp_cond_init(&p->cond);
 
-    OH_OnFrameAvailableListener listener = {
-        .context = p,
-        .onFrameAvailable = image_callback
-    };
-    OH_NativeImage_SetOnFrameAvailableListener(o->image, listener);
+    // OH_OnFrameAvailableListener listener = {
+    //     .context = p,
+    //     .onFrameAvailable = image_callback
+    // };
+    // OH_NativeImage_SetOnFrameAvailableListener(o->image, listener);
 
     mapper->dst_params = mapper->src_params;
     mapper->dst_params.imgfmt = IMGFMT_RGB0;
     mapper->dst_params.hw_subfmt = 0;
 
-    if (!o->ext_init(mapper))
+    if (!ra_get_imgfmt_desc(mapper->ra, mapper->dst_params.imgfmt, &p->desc)) {
+        MP_ERR(mapper, "Unsupported texture format: %s\n",
+            mp_imgfmt_to_name(mapper->dst_params.imgfmt));
+        return -1;
+    }
+
+    MP_VERBOSE(mapper, "test: %d\n", p->desc.num_planes);
+    if (!o->interop_init(mapper))
         return -1;
 
     return 0;
@@ -147,12 +150,12 @@ static void mapper_uninit(struct ra_hwdec_mapper *mapper)
     struct ohcodec_mapper_priv *p = mapper->priv;
     struct ohcodec_priv *o = mapper->owner->priv;
 
-    OH_NativeImage_UnsetOnFrameAvailableListener(o->image);
+    // OH_NativeImage_UnsetOnFrameAvailableListener(o->image);
 
-    o->ext_uninit(mapper);
+    o->interop_uninit(mapper);
 
-    mp_mutex_destroy(&p->lock);
-    mp_cond_destroy(&p->cond);
+    // mp_mutex_destroy(&p->lock);
+    // mp_cond_destroy(&p->cond);
 }
 
 static int mapper_map(struct ra_hwdec_mapper *mapper)
@@ -160,25 +163,23 @@ static int mapper_map(struct ra_hwdec_mapper *mapper)
     struct ohcodec_mapper_priv *p = mapper->priv;
     struct ohcodec_priv *o = mapper->owner->priv;
 
-    {
-        if (mapper->src->imgfmt != IMGFMT_OHCODEC)
-            return -1;
-        AVFrame *frame = (AVFrame *)mapper->src->planes[3];
-        // av_frame_unref(frame);
-    }
+    // {
+    //     if (mapper->src->imgfmt != IMGFMT_OHCODEC)
+    //         return -1;
+    // }
 
-    bool image_available = false;
-    mp_mutex_lock(&p->lock);
-    if (!p->image_available) {
-        mp_cond_timedwait(&p->cond, &p->lock, MP_TIME_MS_TO_NS(100));
-        if (!p->image_available)
-            MP_WARN(mapper, "Waiting for frame timed out!\n");
-    }
-    image_available = p->image_available;
-    p->image_available = false;
-    mp_mutex_unlock(&p->lock);
+    // bool image_available = false;
+    // mp_mutex_lock(&p->lock);
+    // if (!p->image_available) {
+    //     mp_cond_timedwait(&p->cond, &p->lock, MP_TIME_MS_TO_NS(100));
+    //     if (!p->image_available)
+    //         MP_WARN(mapper, "Waiting for frame timed out!\n");
+    // }
+    // image_available = p->image_available;
+    // p->image_available = false;
+    // mp_mutex_unlock(&p->lock);
 
-    o->ext_map(mapper);
+    o->interop_map(mapper);
 
     // int fence_fd = -1;
     // int32_t stride = 0;
@@ -215,6 +216,8 @@ static void mapper_unmap(struct ra_hwdec_mapper *mapper)
 {
     struct ohcodec_mapper_priv *p = mapper->priv;
     struct ohcodec_priv *o = mapper->owner->priv;
+
+    o->interop_unmap(mapper);
 
     // if (p->buffer) {
     //     OH_NativeWindow_NativeObjectUnreference(p->buffer);

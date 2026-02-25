@@ -1334,7 +1334,7 @@ endif
 
 if features['vulkan'] and features['ohos']
      sources += files('video/out/vulkan/context_ohos.c',
-                      'video/out/hwdec/hwdec_ohcodec_vk.c')
+                      'video/out/hwdec/hwdec_ohcodec_pl.c')
 endif
 
 features += {'vk-khr-display': vulkan.type_name() == 'internal' or

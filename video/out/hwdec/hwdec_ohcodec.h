@@ -23,40 +23,33 @@
 #include <native_image/native_image.h>
 
 #include "video/out/gpu/hwdec.h"
-#include "video/out/opengl/gl_headers.h"
 
 struct ohcodec_priv {
     struct mp_hwdec_ctx hwctx;
     OHNativeWindow *window;
-    OH_NativeImage *image;
+    // OH_NativeImage *image;
 
-    bool (*ext_init)(struct ra_hwdec_mapper *mapper);
-    void (*ext_uninit)(struct ra_hwdec_mapper *mapper);
-    void (*ext_map)(struct ra_hwdec_mapper *mapper);
+    bool (*interop_init)(struct ra_hwdec_mapper *mapper);
+    void (*interop_uninit)(struct ra_hwdec_mapper *mapper);
 
-    // These are only necessary if the gpu api requires synchronisation
-    bool (*ext_wait)(const struct ra_hwdec_mapper *mapper, int n);
-    bool (*ext_signal)(const struct ra_hwdec_mapper *mapper, int n);
+    bool (*interop_map)(struct ra_hwdec_mapper *mapper);
+    void (*interop_unmap)(struct ra_hwdec_mapper *mapper);
 };
 
 struct ohcodec_mapper_priv {
     struct mp_log *log;
-
-    // OpenGL
-    GLuint gl_texture;
+    struct ra_imgfmt_desc desc;
 
     OHNativeWindowBuffer* buffer;
 
-    mp_mutex lock;
-    mp_cond cond;
-    bool image_available;
+    // mp_mutex lock;
+    // mp_cond cond;
+    // bool image_available;
+
+    void *priv;
 };
 
-struct ohcodec_interop_fn {
-    bool (*check)(const struct ra_hwdec *hw);
-    void (*init)(const struct ra_hwdec *hw);
-};
+typedef bool (*ohcodec_interop_init)(const struct ra_hwdec *hw);
 
-extern struct ohcodec_interop_fn ohcodec_gl_fn;
-
-extern struct ohcodec_interop_fn ohcodec_vk_fn;
+bool ohcodec_interop_gl_init(const struct ra_hwdec *hw);
+bool ohcodec_interop_pl_init(const struct ra_hwdec *hw);

@@ -17,30 +17,36 @@
 
 #include "hwdec_ohcodec.h"
 
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <EGL/eglplatform.h>
 #include "video/out/opengl/ra_gl.h"
 
-static bool ext_init(struct ra_hwdec_mapper *mapper)
+typedef void *GLeglImageOES;
+typedef void *EGLImageKHR;
+
+struct ohcodec_gl_priv {
+    GLuint gl_texture;
+};
+
+static bool interop_init(struct ra_hwdec_mapper *mapper)
 {
-    struct ohcodec_mapper_priv *p = mapper->priv;
+    struct ohcodec_mapper_priv *p_mapper = mapper->priv;
     struct ohcodec_priv *o = mapper->owner->priv;
+    struct ohcodec_gl_priv *p = talloc_zero(p_mapper, struct ohcodec_gl_priv);
+    p_mapper->priv = p;
     GL *gl = ra_gl_get(mapper->ra);
 
     gl->GenTextures(1, &p->gl_texture);
-    gl->BindTexture(GL_TEXTURE_EXTERNAL_OES, p->gl_texture);
-    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    gl->BindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
-
-    OH_NativeImage_AttachContext(o->image, p->gl_texture);
+    MP_VERBOSE(mapper, "test: gl_texture: %d\n", p->gl_texture);
 
     return true;
 }
 
-static void ext_uninit(struct ra_hwdec_mapper *mapper)
+static void interop_uninit(struct ra_hwdec_mapper *mapper)
 {
-    struct ohcodec_mapper_priv *p = mapper->priv;
+    struct ohcodec_mapper_priv *p_mapper = mapper->priv;
+    struct ohcodec_gl_priv *p = p_mapper->priv;
     GL *gl = ra_gl_get(mapper->ra);
 
     gl->DeleteTextures(1, &p->gl_texture);
@@ -49,9 +55,21 @@ static void ext_uninit(struct ra_hwdec_mapper *mapper)
     ra_tex_free(mapper->ra, &mapper->tex[0]);
 }
 
-static void ext_map(struct ra_hwdec_mapper *mapper)
+static bool interop_map(struct ra_hwdec_mapper *mapper)
 {
-    struct ohcodec_mapper_priv *p = mapper->priv;
+    struct ohcodec_mapper_priv *p_mapper = mapper->priv;
+    struct ohcodec_priv *o = mapper->owner->priv;
+    struct ohcodec_gl_priv *p = p_mapper->priv;
+    GL *gl = ra_gl_get(mapper->ra);
+
+    gl->BindTexture(GL_TEXTURE_EXTERNAL_OES, p->gl_texture);
+    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl->TexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl->BindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
+
+    // OH_NativeImage_AttachContext(o->image, p->gl_texture);
 
     struct ra_tex_params params = {
         .dimensions = 2,
@@ -61,35 +79,35 @@ static void ext_map(struct ra_hwdec_mapper *mapper)
         .format = ra_find_unorm_format(mapper->ra, 1, 4),
         .render_src = true,
         .src_linear = true,
-        .host_mutable = true,
-        // .external_oes = true,
     };
 
     if (params.format->ctype != RA_CTYPE_UNORM)
-        return;
+        return false;
 
     mapper->tex[0] = ra_create_wrapped_tex(mapper->ra, &params, p->gl_texture);
+    if (!mapper->tex[0])
+        return false;
+
+    return true;
 }
 
-static bool check(const struct ra_hwdec *hw)
+static void interop_unmap(struct ra_hwdec_mapper *mapper)
 {
-    if (ra_is_gl(hw->ra_ctx->ra)) {
-        MP_VERBOSE(hw, "OHCodec is using OpenGL backend\n");
-        return true;
-    }
-    return false;
+
 }
 
-static void init(const struct ra_hwdec *hw)
+bool ohcodec_interop_gl_init(const struct ra_hwdec *hw)
 {
     struct ohcodec_priv *p = hw->priv;
 
-    p->ext_init = ext_init;
-    p->ext_uninit = ext_uninit;
-    p->ext_map = ext_map;
-}
+    if (!ra_is_gl(hw->ra_ctx->ra))
+        return false;
+    MP_VERBOSE(hw, "OHCodec is using OpenGL backend\n");
 
-struct ohcodec_interop_fn ohcodec_gl_fn = {
-    .check = check,
-    .init = init
-};
+    p->interop_init = interop_init;
+    p->interop_uninit = interop_uninit;
+    p->interop_map = interop_map;
+    p->interop_unmap = interop_unmap;
+
+    return true;
+}
