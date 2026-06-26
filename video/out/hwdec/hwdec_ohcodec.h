@@ -19,15 +19,13 @@
 #pragma once
 
 #include <stdbool.h>
-#include <native_window/external_window.h>
-#include <native_image/native_image.h>
+#include <native_buffer/native_buffer.h>
 
 #include "video/out/gpu/hwdec.h"
+#include "video/mp_image.h"
 
 struct ohcodec_priv {
     struct mp_hwdec_ctx hwctx;
-    OHNativeWindow *window;
-    // OH_NativeImage *image;
 
     bool (*interop_init)(struct ra_hwdec_mapper *mapper);
     void (*interop_uninit)(struct ra_hwdec_mapper *mapper);
@@ -39,12 +37,12 @@ struct ohcodec_priv {
 struct ohcodec_mapper_priv {
     struct mp_log *log;
     struct ra_imgfmt_desc desc;
-
-    OHNativeWindowBuffer* buffer;
-
-    // mp_mutex lock;
-    // mp_cond cond;
-    // bool image_available;
+    struct mp_image layout;
+    OH_NativeBuffer *native_buffer;
+    void *mapped_addr;
+    OH_NativeBuffer_Planes planes;
+    uint8_t *upload_buffer;
+    size_t upload_buffer_size;
 
     void *priv;
 };
@@ -53,3 +51,7 @@ typedef bool (*ohcodec_interop_init)(const struct ra_hwdec *hw);
 
 bool ohcodec_interop_gl_init(const struct ra_hwdec *hw);
 bool ohcodec_interop_pl_init(const struct ra_hwdec *hw);
+bool ohcodec_upload_init(struct ra_hwdec_mapper *mapper);
+void ohcodec_upload_uninit(struct ra_hwdec_mapper *mapper);
+bool ohcodec_upload_map(struct ra_hwdec_mapper *mapper);
+void ohcodec_upload_unmap(struct ra_hwdec_mapper *mapper);
