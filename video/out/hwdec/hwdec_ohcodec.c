@@ -37,26 +37,38 @@ static const ohcodec_interop_init interop_inits[] = {
     NULL
 };
 
-static AVBufferRef *create_ohcodec_device_ref(void)
+static AVBufferRef *create_ohcodec_device_ref(struct ra_hwdec *hw)
 {
-    AVBufferRef *device_ref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_OHCODEC);
-    if (!device_ref)
-        return NULL;
+   struct ohcodec_priv *p = hw->priv;
+   AVBufferRef *device_ref = av_hwdevice_ctx_alloc(AV_HWDEVICE_TYPE_OHCODEC);
+   if (!device_ref)
+       return NULL;
 
-    AVHWDeviceContext *ctx = (void *)device_ref->data;
-    AVOHCodecDeviceContext *hwctx = ctx->hwctx;
-    hwctx->output_mode = AV_OHCODEC_OUTPUT_MODE_BUFFER;
+   AVHWDeviceContext *ctx = (void *)device_ref->data;
+   AVOHCodecDeviceContext *hwctx = ctx->hwctx;
+   hwctx->output_mode = p->output_mode;
 
-    if (av_hwdevice_ctx_init(device_ref) < 0)
-        av_buffer_unref(&device_ref);
+   if (hwctx->output_mode == AV_OHCODEC_OUTPUT_MODE_SURFACE) {
+       hwctx->native_window = p->interop_get_native_window
+           ? p->interop_get_native_window(hw)
+           : NULL;
+       hwctx->native_window_owned = 0;
+       if (!hwctx->native_window) {
+           av_buffer_unref(&device_ref);
+           return NULL;
+       }
+   }
 
-    return device_ref;
+   if (av_hwdevice_ctx_init(device_ref) < 0)
+       av_buffer_unref(&device_ref);
+
+   return device_ref;
 }
 
-static AVOHCodecDeviceContext *mapper_device_hwctx(struct ra_hwdec_mapper *mapper)
+AVOHCodecDeviceContext *ohcodec_mapper_device_hwctx(struct ra_hwdec_mapper *mapper)
 {
-    if (!mapper->src || !mapper->src->hwctx)
-        return NULL;
+   if (!mapper->src || !mapper->src->hwctx)
+       return NULL;
 
     AVHWFramesContext *frames_ctx = (AVHWFramesContext *)mapper->src->hwctx->data;
     if (!frames_ctx || !frames_ctx->device_ref)
@@ -69,7 +81,7 @@ static AVOHCodecDeviceContext *mapper_device_hwctx(struct ra_hwdec_mapper *mappe
     return device_ctx->hwctx;
 }
 
-static const AVOHCodecFrameDescriptor *mapper_frame_desc(struct ra_hwdec_mapper *mapper)
+const AVOHCodecFrameDescriptor *ohcodec_mapper_frame_desc(struct ra_hwdec_mapper *mapper)
 {
     if (!mapper->src || mapper->src->imgfmt != IMGFMT_OHCODEC)
         return NULL;
@@ -77,7 +89,17 @@ static const AVOHCodecFrameDescriptor *mapper_frame_desc(struct ra_hwdec_mapper 
     return (const AVOHCodecFrameDescriptor *)mapper->src->planes[3];
 }
 
-static void release_native_buffer(struct ra_hwdec_mapper *mapper)
+OH_NativeBuffer *ohcodec_get_native_buffer(struct ra_hwdec_mapper *mapper,
+                                           const AVOHCodecFrameDescriptor *desc)
+{
+    OH_NativeBuffer *native_buffer =
+        OH_AVBuffer_GetNativeBuffer((OH_AVBuffer *)desc->buffer);
+    if (!native_buffer)
+        MP_ERR(mapper, "Failed to get OH_NativeBuffer from OH_AVBuffer\n");
+    return native_buffer;
+}
+
+static void release_upload_buffer(struct ra_hwdec_mapper *mapper)
 {
     struct ohcodec_mapper_priv *p = mapper->priv;
 
@@ -183,28 +205,29 @@ static int acquire_native_buffer(struct ra_hwdec_mapper *mapper,
 {
     struct ohcodec_mapper_priv *p = mapper->priv;
 
-    p->native_buffer = OH_AVBuffer_GetNativeBuffer((OH_AVBuffer *)desc->buffer);
+    p->native_buffer = ohcodec_get_native_buffer(mapper, desc);
     if (!p->native_buffer) {
-        MP_ERR(mapper, "Failed to get OH_NativeBuffer from OH_AVBuffer\n");
         return -1;
     }
 
     int ret = OH_NativeBuffer_MapPlanes(p->native_buffer, &p->mapped_addr, &p->planes);
     if (ret != NATIVE_ERROR_OK) {
         MP_ERR(mapper, "OH_NativeBuffer_MapPlanes failed: %d\n", ret);
-        release_native_buffer(mapper);
+        release_upload_buffer(mapper);
         return -1;
     }
 
     if (!p->mapped_addr || p->planes.planeCount < p->layout.num_planes) {
         MP_ERR(mapper, "Mapped OH_NativeBuffer returned %u planes, need %d\n",
                p->planes.planeCount, p->layout.num_planes);
-        release_native_buffer(mapper);
+        release_upload_buffer(mapper);
         return -1;
     }
 
     return 0;
 }
+
+static void ohcodec_upload_uninit(struct ra_hwdec_mapper *mapper);
 
 static int init(struct ra_hwdec *hw)
 {
@@ -224,7 +247,7 @@ static int init(struct ra_hwdec *hw)
 
     p->hwctx = (struct mp_hwdec_ctx){
         .driver_name = hw->driver->name,
-        .av_device_ref = create_ohcodec_device_ref(),
+        .av_device_ref = create_ohcodec_device_ref(hw),
         .hw_imgfmt = IMGFMT_OHCODEC,
     };
 
@@ -244,11 +267,29 @@ static void uninit(struct ra_hwdec *hw)
 
     hwdec_devices_remove(hw->devs, &p->hwctx);
     av_buffer_unref(&p->hwctx.av_device_ref);
+    if (p->interop_owner_uninit)
+        p->interop_owner_uninit(hw);
 }
 
-bool ohcodec_upload_init(struct ra_hwdec_mapper *mapper)
+static bool ohcodec_upload_init(struct ra_hwdec_mapper *mapper)
 {
     struct ohcodec_mapper_priv *p = mapper->priv;
+
+    mapper->dst_params = mapper->src_params;
+    mapper->dst_params.imgfmt = mapper->src_params.hw_subfmt;
+    mapper->dst_params.hw_subfmt = 0;
+
+    if (!mapper->dst_params.imgfmt) {
+        MP_ERR(mapper, "OHCodec hwdec requires a software sub-format.\n");
+        return false;
+    }
+
+    mp_image_set_params(&p->layout, &mapper->dst_params);
+    if (!ra_get_imgfmt_desc(mapper->ra, mapper->dst_params.imgfmt, &p->desc)) {
+        MP_ERR(mapper, "Unsupported texture format: %s\n",
+               mp_imgfmt_to_name(mapper->dst_params.imgfmt));
+        return false;
+    }
 
     for (int n = 0; n < p->layout.num_planes; n++) {
         if (!p->desc.planes[n]) {
@@ -278,20 +319,28 @@ bool ohcodec_upload_init(struct ra_hwdec_mapper *mapper)
     return true;
 }
 
-void ohcodec_upload_uninit(struct ra_hwdec_mapper *mapper)
+static void ohcodec_upload_uninit(struct ra_hwdec_mapper *mapper)
 {
     for (int n = 0; n < MP_MAX_PLANES; n++)
         ra_tex_free(mapper->ra, &mapper->tex[n]);
 }
 
-bool ohcodec_upload_map(struct ra_hwdec_mapper *mapper)
+static bool ohcodec_upload_map(struct ra_hwdec_mapper *mapper)
 {
     struct ohcodec_mapper_priv *p = mapper->priv;
+    const AVOHCodecFrameDescriptor *desc = ohcodec_mapper_frame_desc(mapper);
+    if (!desc)
+        return false;
+
+    if (acquire_native_buffer(mapper, desc) < 0)
+        return false;
 
     for (int n = 0; n < p->layout.num_planes; n++) {
         struct plane_upload_layout layout;
-        if (!get_plane_upload_layout(mapper, n, &layout))
+        if (!get_plane_upload_layout(mapper, n, &layout)) {
+            release_upload_buffer(mapper);
             return false;
+        }
 
         struct ra_tex_upload_params params = {
             .tex = mapper->tex[n],
@@ -302,19 +351,22 @@ bool ohcodec_upload_map(struct ra_hwdec_mapper *mapper)
 
         if (!params.src || !params.stride) {
             MP_ERR(mapper, "Missing mapped data for OHCodec plane %d\n", n);
+            release_upload_buffer(mapper);
             return false;
         }
 
         if (!mapper->ra->fns->tex_upload(mapper->ra, &params)) {
             MP_ERR(mapper, "Failed to upload OHCodec plane %d\n", n);
+            release_upload_buffer(mapper);
             return false;
         }
     }
 
+    release_upload_buffer(mapper);
     return true;
 }
 
-void ohcodec_upload_unmap(struct ra_hwdec_mapper *mapper)
+static void ohcodec_upload_unmap(struct ra_hwdec_mapper *mapper)
 {
 }
 
@@ -322,25 +374,7 @@ static int mapper_init(struct ra_hwdec_mapper *mapper)
 {
     struct ohcodec_mapper_priv *p = mapper->priv;
     struct ohcodec_priv *o = mapper->owner->priv;
-
     p->log = mapper->log;
-
-    mapper->dst_params = mapper->src_params;
-    mapper->dst_params.imgfmt = mapper->src_params.hw_subfmt;
-    mapper->dst_params.hw_subfmt = 0;
-
-    if (!mapper->dst_params.imgfmt) {
-        MP_ERR(mapper, "OHCodec hwdec requires a software sub-format.\n");
-        return -1;
-    }
-
-    mp_image_set_params(&p->layout, &mapper->dst_params);
-
-    if (!ra_get_imgfmt_desc(mapper->ra, mapper->dst_params.imgfmt, &p->desc)) {
-        MP_ERR(mapper, "Unsupported texture format: %s\n",
-               mp_imgfmt_to_name(mapper->dst_params.imgfmt));
-        return -1;
-    }
 
     if (!o->interop_init(mapper))
         return -1;
@@ -352,15 +386,14 @@ static void mapper_uninit(struct ra_hwdec_mapper *mapper)
 {
     struct ohcodec_priv *o = mapper->owner->priv;
 
-    release_native_buffer(mapper);
     o->interop_uninit(mapper);
 }
 
 static int mapper_map(struct ra_hwdec_mapper *mapper)
 {
     struct ohcodec_priv *o = mapper->owner->priv;
-    const AVOHCodecFrameDescriptor *desc = mapper_frame_desc(mapper);
-    AVOHCodecDeviceContext *device = mapper_device_hwctx(mapper);
+    const AVOHCodecFrameDescriptor *desc = ohcodec_mapper_frame_desc(mapper);
+    AVOHCodecDeviceContext *device = ohcodec_mapper_device_hwctx(mapper);
 
     if (!desc) {
         MP_ERR(mapper, "Missing OHCodec frame descriptor\n");
@@ -372,16 +405,12 @@ static int mapper_map(struct ra_hwdec_mapper *mapper)
         return -1;
     }
 
-    if (acquire_native_buffer(mapper, desc) < 0)
-        return -1;
-
     if (!o->interop_map(mapper)) {
-        release_native_buffer(mapper);
         return -1;
     }
 
-    release_native_buffer(mapper);
-    mp_image_unrefp(&mapper->src);
+    if (o->release_src_after_map)
+        mp_image_unrefp(&mapper->src);
 
     return 0;
 }
@@ -391,7 +420,6 @@ static void mapper_unmap(struct ra_hwdec_mapper *mapper)
     struct ohcodec_priv *o = mapper->owner->priv;
 
     o->interop_unmap(mapper);
-    release_native_buffer(mapper);
 }
 
 const struct ra_hwdec_driver ra_hwdec_ohcodec = {

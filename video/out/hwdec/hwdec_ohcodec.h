@@ -26,6 +26,11 @@
 
 struct ohcodec_priv {
     struct mp_hwdec_ctx hwctx;
+    int output_mode;
+    bool release_src_after_map;
+    void *interop_owner_priv;
+    void *(*interop_get_native_window)(struct ra_hwdec *hw);
+    void (*interop_owner_uninit)(struct ra_hwdec *hw);
 
     bool (*interop_init)(struct ra_hwdec_mapper *mapper);
     void (*interop_uninit)(struct ra_hwdec_mapper *mapper);
@@ -47,11 +52,11 @@ struct ohcodec_mapper_priv {
     void *priv;
 };
 
-typedef bool (*ohcodec_interop_init)(const struct ra_hwdec *hw);
+typedef bool (*ohcodec_interop_init)(struct ra_hwdec *hw);
 
-bool ohcodec_interop_gl_init(const struct ra_hwdec *hw);
-bool ohcodec_interop_pl_init(const struct ra_hwdec *hw);
-bool ohcodec_upload_init(struct ra_hwdec_mapper *mapper);
-void ohcodec_upload_uninit(struct ra_hwdec_mapper *mapper);
-bool ohcodec_upload_map(struct ra_hwdec_mapper *mapper);
-void ohcodec_upload_unmap(struct ra_hwdec_mapper *mapper);
+bool ohcodec_interop_gl_init(struct ra_hwdec *hw);
+bool ohcodec_interop_pl_init(struct ra_hwdec *hw);
+AVOHCodecDeviceContext *ohcodec_mapper_device_hwctx(struct ra_hwdec_mapper *mapper);
+const AVOHCodecFrameDescriptor *ohcodec_mapper_frame_desc(struct ra_hwdec_mapper *mapper);
+OH_NativeBuffer *ohcodec_get_native_buffer(struct ra_hwdec_mapper *mapper,
+                                           const AVOHCodecFrameDescriptor *desc);
