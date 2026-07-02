@@ -89,9 +89,28 @@ const AVOHCodecFrameDescriptor *ohcodec_mapper_frame_desc(struct ra_hwdec_mapper
     return (const AVOHCodecFrameDescriptor *)mapper->src->planes[3];
 }
 
+static OH_NativeBuffer *ohcodec_retained_native_buffer(
+    struct ra_hwdec_mapper *mapper, bool take_reference)
+{
+    if (!mapper->src || mapper->src->imgfmt != IMGFMT_OHCODEC ||
+        !mapper->src->bufs[1] || !mapper->src->bufs[1]->data)
+        return NULL;
+
+    OH_NativeBuffer *buffer =
+        (OH_NativeBuffer *)mapper->src->bufs[1]->data;
+    if (take_reference && OH_NativeBuffer_Reference(buffer) != 0)
+        return NULL;
+    return buffer;
+}
+
 OH_NativeBuffer *ohcodec_get_native_buffer(struct ra_hwdec_mapper *mapper,
                                            const AVOHCodecFrameDescriptor *desc)
 {
+    OH_NativeBuffer *retained =
+        ohcodec_retained_native_buffer(mapper, true);
+    if (retained)
+        return retained;
+
     OH_NativeBuffer *native_buffer =
         OH_AVBuffer_GetNativeBuffer((OH_AVBuffer *)desc->buffer);
     if (!native_buffer)
@@ -401,8 +420,12 @@ static int mapper_map(struct ra_hwdec_mapper *mapper)
     }
 
     if (device && desc->generation != device->output_generation) {
-        MP_WARN(mapper, "Discarding stale OHCodec frame after decoder reset/flush\n");
-        return -1;
+        if (!ohcodec_retained_native_buffer(mapper, false)) {
+            MP_WARN(mapper, "Discarding stale OHCodec frame after decoder reset/flush\n");
+            return -1;
+        }
+        MP_VERBOSE(mapper, "Mapping retained OHCodec NativeBuffer after "
+                   "decoder reset/flush\n");
     }
 
     if (!o->interop_map(mapper)) {

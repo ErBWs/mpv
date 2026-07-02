@@ -30,6 +30,14 @@
 #include <libavutil/mastering_display_metadata.h>
 #include <libplacebo/utils/libav.h>
 
+#include "config.h"
+
+#if HAVE_OHOS
+#include <libavutil/hwcontext_oh.h>
+#include <multimedia/player_framework/native_avbuffer.h>
+#include <native_buffer/native_buffer.h>
+#endif
+
 #include "mpv_talloc.h"
 
 #include "common/av_common.h"
@@ -1054,6 +1062,35 @@ void mp_image_params_guess_csp(struct mp_image_params *params)
     }
 }
 
+#if HAVE_OHOS
+static void free_ohcodec_native_buffer(void *opaque, uint8_t *data)
+{
+    OH_NativeBuffer_Unreference((OH_NativeBuffer *)data);
+}
+
+static void retain_ohcodec_native_buffer(struct mp_image *img)
+{
+    if (!img || img->imgfmt != IMGFMT_OHCODEC || !img->planes[3] ||
+        img->bufs[1])
+        return;
+
+    const AVOHCodecFrameDescriptor *desc = (void *)img->planes[3];
+    OH_NativeBuffer *buffer =
+        OH_AVBuffer_GetNativeBuffer((OH_AVBuffer *)desc->buffer);
+    if (!buffer)
+        return;
+
+    // OH_AVBuffer_GetNativeBuffer returns an owned NativeBuffer reference.
+    // Keep it independently of the decoder output index, which becomes
+    // invalid as soon as OH_VideoDecoder_Flush/Stop is called.
+    img->bufs[1] = av_buffer_create((uint8_t *)buffer, 0,
+                                    free_ohcodec_native_buffer, NULL,
+                                    AV_BUFFER_FLAG_READONLY);
+    if (!img->bufs[1])
+        OH_NativeBuffer_Unreference(buffer);
+}
+#endif
+
 // Create a new mp_image reference to av_frame.
 struct mp_image *mp_image_from_av_frame(struct AVFrame *src)
 {
@@ -1199,6 +1236,10 @@ struct mp_image *mp_image_from_av_frame(struct AVFrame *src)
     }
 
     struct mp_image *res = mp_image_new_ref(dst);
+
+#if HAVE_OHOS
+    retain_ohcodec_native_buffer(res);
+#endif
 
     // Allocated, but non-refcounted data.
     talloc_free(dst->ff_side_data);
