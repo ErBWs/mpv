@@ -1245,6 +1245,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
     // Calculate target
     struct pl_frame target;
     pl_frame_from_swapchain(&target, &swframe);
+    if (pass_colorspace)
+        target.color = hint;
     bool strict_sw_params = target_hint && !pass_colorspace && p->next_opts->target_hint_strict;
     apply_target_options(p, &target, hint.hdr.min_luma, strict_sw_params);
     update_overlays(vo, p->osd_res,

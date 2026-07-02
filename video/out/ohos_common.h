@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <libplacebo/colorspace.h>
+#include <native_buffer/buffer_common.h>
+#include <native_buffer/native_buffer.h>
 #include <native_window/external_window.h>
 
 #include "common/common.h"
@@ -27,3 +30,5 @@ bool vo_ohos_init(struct vo *vo);
 void vo_ohos_uninit(struct vo *vo);
 OHNativeWindow *vo_ohos_native_window(struct vo *vo);
 bool vo_ohos_surface_size(struct vo *vo, int *w, int *h);
+struct pl_color_space vo_ohos_preferred_csp(struct vo *vo);
+bool vo_ohos_set_10bit_format(struct vo *vo);

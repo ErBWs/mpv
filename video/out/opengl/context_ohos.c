@@ -30,6 +30,16 @@ struct priv {
     EGLSurface egl_surface;
 };
 
+static pl_color_space_t ohos_preferred_csp(struct ra_ctx *ctx)
+{
+    return vo_ohos_preferred_csp(ctx->vo);
+}
+
+static bool ohos_pass_colorspace(struct ra_ctx *ctx)
+{
+    return true;
+}
+
 static void ohos_swap_buffers(struct ra_ctx *ctx)
 {
     struct priv *p = ctx->priv;
@@ -87,6 +97,7 @@ static bool ohos_init(struct ra_ctx *ctx)
     mpegl_load_functions(&p->gl, ctx->log);
 
     struct ra_ctx_params params = {
+        .preferred_csp = ohos_preferred_csp,
         .swap_buffers = ohos_swap_buffers,
     };
 
@@ -121,6 +132,7 @@ const struct ra_ctx_fns ra_ctx_ohos = {
     .name           = "ohos",
     .description    = "HarmonyOS/EGL",
     .reconfig       = ohos_reconfig,
+    .pass_colorspace = ohos_pass_colorspace,
     .control        = ohos_control,
     .init           = ohos_init,
     .uninit         = ohos_uninit,

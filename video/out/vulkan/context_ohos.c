@@ -27,6 +27,16 @@ struct priv {
     struct mpvk_ctx vk;
 };
 
+static pl_color_space_t ohos_preferred_csp(struct ra_ctx *ctx)
+{
+    return vo_ohos_preferred_csp(ctx->vo);
+}
+
+static bool ohos_pass_colorspace(struct ra_ctx *ctx)
+{
+    return true;
+}
+
 static void ohos_uninit(struct ra_ctx *ctx)
 {
     struct priv *p = ctx->priv;
@@ -45,6 +55,8 @@ static bool ohos_init(struct ra_ctx *ctx)
     if (!vo_ohos_init(ctx->vo))
         goto fail;
 
+    vo_ohos_set_10bit_format(ctx->vo);
+
     if (!mpvk_init(vk, ctx, VK_OHOS_SURFACE_EXTENSION_NAME))
         goto fail;
 
@@ -53,7 +65,9 @@ static bool ohos_init(struct ra_ctx *ctx)
          .window = vo_ohos_native_window(ctx->vo)
     };
 
-    struct ra_ctx_params params = {0};
+    struct ra_ctx_params params = {
+        .preferred_csp = ohos_preferred_csp,
+    };
 
     VkInstance inst = vk->vkinst->instance;
     VkResult res = vkCreateSurfaceOHOS(inst, &info, NULL, &vk->surface);
@@ -91,6 +105,7 @@ const struct ra_ctx_fns ra_ctx_vulkan_ohos = {
     .name           = "ohosvk",
     .description    = "HarmonyOS/Vulkan",
     .reconfig       = ohos_reconfig,
+    .pass_colorspace = ohos_pass_colorspace,
     .control        = ohos_control,
     .init           = ohos_init,
     .uninit         = ohos_uninit,
