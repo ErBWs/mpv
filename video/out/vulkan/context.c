@@ -25,6 +25,10 @@
 
 #include "context.h"
 
+#if HAVE_OHOS
+#include <vulkan/vulkan_ohos.h>
+#endif
+
 struct vulkan_opts {
     char *device; // force a specific GPU
     int swap_mode;
@@ -184,6 +188,9 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
      * of the ffmpeg Vulkan hwcontext and video decoding capability.
      */
     const char *opt_extensions[] = {
+#if HAVE_OHOS
+        VK_OHOS_EXTERNAL_MEMORY_EXTENSION_NAME,
+#endif
         VK_EXT_DESCRIPTOR_BUFFER_EXTENSION_NAME,
         VK_EXT_SHADER_ATOMIC_FLOAT_EXTENSION_NAME,
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
