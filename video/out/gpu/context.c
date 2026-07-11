@@ -42,12 +42,14 @@ extern const struct ra_ctx_fns ra_ctx_wgl;
 extern const struct ra_ctx_fns ra_ctx_angle;
 extern const struct ra_ctx_fns ra_ctx_dxgl;
 extern const struct ra_ctx_fns ra_ctx_android;
+extern const struct ra_ctx_fns ra_ctx_ohos;
 
 /* Vulkan */
 extern const struct ra_ctx_fns ra_ctx_vulkan_wayland;
 extern const struct ra_ctx_fns ra_ctx_vulkan_win;
 extern const struct ra_ctx_fns ra_ctx_vulkan_xlib;
 extern const struct ra_ctx_fns ra_ctx_vulkan_android;
+extern const struct ra_ctx_fns ra_ctx_vulkan_ohos;
 extern const struct ra_ctx_fns ra_ctx_vulkan_display;
 extern const struct ra_ctx_fns ra_ctx_vulkan_mac;
 
@@ -102,6 +104,9 @@ static const struct ra_ctx_fns *const contexts[] = {
 #if HAVE_EGL_ANDROID
     &ra_ctx_android,
 #endif
+#if HAVE_EGL_OHOS
+    &ra_ctx_ohos,
+#endif
 #if HAVE_EGL_ANGLE_WIN32
     &ra_ctx_angle,
 #endif
@@ -128,6 +133,9 @@ static const struct ra_ctx_fns *const contexts[] = {
 #if HAVE_VULKAN
 #if HAVE_ANDROID
     &ra_ctx_vulkan_android,
+#endif
+#if HAVE_OHOS
+    &ra_ctx_vulkan_ohos,
 #endif
 #if HAVE_VK_KHR_DISPLAY
     &ra_ctx_vulkan_display,

@@ -275,6 +275,7 @@ const struct autoprobe_info hwdec_autoprobe_info[] = {
     {"drm",             HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"mediacodec",      HWDEC_FLAG_AUTO},
     {"videotoolbox",    HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
+    {"ohcodec",         HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"d3d11va-copy",    HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"vulkan-copy",     HWDEC_FLAG_AUTO},
     {"dxva2-copy",      HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
@@ -284,6 +285,7 @@ const struct autoprobe_info hwdec_autoprobe_info[] = {
     {"drm-copy",        HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"mediacodec-copy", HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {"videotoolbox-copy", HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
+    {"ohcodec-copy",    HWDEC_FLAG_AUTO | HWDEC_FLAG_WHITELIST},
     {0}
 };
 

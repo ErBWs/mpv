@@ -319,6 +319,8 @@ void gl_sc_uniform_texture(struct gl_shader_cache *sc, char *name,
         glsl_type = "sampler3D";
     } else if (tex->params.non_normalized) {
         glsl_type = "sampler2DRect";
+    } else if (tex->params.external_yuv) {
+        glsl_type = "__samplerExternal2DY2YEXT";
     } else if (tex->params.external_oes) {
         glsl_type = "samplerExternalOES";
     } else if (tex->params.format->ctype == RA_CTYPE_UINT) {

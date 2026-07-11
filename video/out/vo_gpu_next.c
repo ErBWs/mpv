@@ -608,6 +608,9 @@ static pl_tex hwdec_get_tex(struct priv *p, struct ra_hwdec_mapper *mapper, int 
         struct pl_opengl_wrap_params par = {
             .width = ratex->params.w,
             .height = ratex->params.h,
+            .sampler_type = ratex->params.external_yuv
+                          ? PL_SAMPLER_EXTERNAL_YUV
+                          : PL_SAMPLER_NORMAL,
         };
 
         ra_gl_get_format(ratex->params.format, &par.iformat,
@@ -2326,6 +2329,10 @@ static void uninit(struct vo *vo)
 
     timer_pool_destroy(p->sw_upload_timer);
 
+    // Vulkan OHCodec passes may contain immutable YCbCr samplers owned by the
+    // hwdec context. Destroy the renderer/pass cache before those samplers.
+    pl_renderer_destroy(&p->rr);
+
     if (vo->hwdec_devs) {
         ra_hwdec_mapper_free(&p->hwdec_mapper);
         timer_pool_destroy(p->hwdec_timer);
@@ -2347,7 +2354,6 @@ static void uninit(struct vo *vo)
     pl_lut_free(&p->next_opts->target_lut.lut);
 
     pl_icc_close(&p->icc_profile);
-    pl_renderer_destroy(&p->rr);
 
     for (int i = 0; i < VO_PASS_PERF_MAX; ++i) {
         pl_shader_info_deref(&p->perf_fresh.info[i].shader);
