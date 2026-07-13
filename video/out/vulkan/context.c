@@ -25,6 +25,10 @@
 
 #include "context.h"
 
+#if HAVE_OHOS
+#include <vulkan/vulkan_ohos.h>
+#endif
+
 struct vulkan_opts {
     char *device; // force a specific GPU
     int swap_mode;
@@ -192,6 +196,10 @@ pl_vulkan mppl_create_vulkan(struct vulkan_opts *opts,
         VK_KHR_VIDEO_DECODE_H265_EXTENSION_NAME,
         VK_KHR_VIDEO_QUEUE_EXTENSION_NAME,
         VK_KHR_ZERO_INITIALIZE_WORKGROUP_MEMORY_EXTENSION_NAME,
+#if HAVE_OHOS
+        VK_OHOS_EXTERNAL_MEMORY_EXTENSION_NAME,
+        VK_OHOS_NATIVE_BUFFER_EXTENSION_NAME,
+#endif
         /*
          * Extensions below this point are newer than our minimum required Vulkan
          * headers and so we only activate them if the build time headers contain
@@ -518,6 +526,13 @@ static void get_vsync(struct ra_swapchain *sw,
         p->params.get_vsync(sw->ctx, info);
 }
 
+static void set_color(struct ra_swapchain *sw, struct mp_image_params *params)
+{
+    struct priv *p = sw->priv;
+    if (p->params.set_color)
+        p->params.set_color(sw->ctx, params);
+}
+
 static pl_color_space_t target_csp(struct ra_swapchain *sw)
 {
     struct priv *p = sw->priv;
@@ -528,6 +543,7 @@ static pl_color_space_t target_csp(struct ra_swapchain *sw)
 
 static const struct ra_swapchain_fns vulkan_swapchain = {
     .color_depth   = color_depth,
+    .set_color     = set_color,
     .target_csp    = target_csp,
     .start_frame   = start_frame,
     .submit_frame  = submit_frame,

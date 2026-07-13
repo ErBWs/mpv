@@ -25,6 +25,9 @@
 #if HAVE_COCOA
 #define VK_USE_PLATFORM_METAL_EXT
 #endif
+#if HAVE_OHOS
+#define VK_USE_PLATFORM_OHOS
+#endif
 
 #include <libplacebo/vulkan.h>
 

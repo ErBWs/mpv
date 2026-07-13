@@ -58,6 +58,27 @@ struct mp_imgfmt_entry {
                               {3 * (a), 0, 32 * (a)} }, }}
 
 static const struct mp_imgfmt_entry mp_imgfmt_list[] = {
+    [IMGFMT_OHCODEC_YUV - IMGFMT_CUST_BASE] = {
+        .name = "ohcodec_yuv",
+        .desc = {
+            .flags = MP_IMGFLAG_COLOR_YUV,
+            .comps = { {0, 0, 8}, {0, 8, 8}, {0, 16, 8} },
+        },
+    },
+    [IMGFMT_OHCODEC_YUV_VK8 - IMGFMT_CUST_BASE] = {
+        .name = "ohcodec_yuv_vk8",
+        .desc = {
+            .flags = MP_IMGFLAG_COLOR_YUV,
+            .comps = { {0, 8, 8}, {0, 16, 8}, {0, 0, 8} },
+        },
+    },
+    [IMGFMT_OHCODEC_YUV_VK16 - IMGFMT_CUST_BASE] = {
+        .name = "ohcodec_yuv_vk16",
+        .desc = {
+            .flags = MP_IMGFLAG_COLOR_YUV,
+            .comps = { {0, 16, 16}, {0, 32, 16}, {0, 0, 16} },
+        },
+    },
     // not in ffmpeg
     [IMGFMT_VDPAU_OUTPUT - IMGFMT_CUST_BASE] = {
         .name = "vdpau_output",

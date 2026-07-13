@@ -271,11 +271,19 @@ enum mp_imgfmt {
     IMGFMT_DXVA2,           // IDirect3DSurface9 (NV12/P010/P016)
     IMGFMT_MMAL,            // MMAL_BUFFER_HEADER_T
     IMGFMT_MEDIACODEC,      // AVMediaCodecBuffer
+    IMGFMT_OHCODEC,         // OHCodecBuffer
     IMGFMT_CUDA,            // CUDA Buffer
 
     // Not an actual format; base for mpv-specific descriptor table.
     // Some may still map to AV_PIX_FMT_*.
     IMGFMT_CUST_BASE,
+
+    // One GPU texture whose sampled R/G/B channels are raw Y/Cb/Cr.
+    IMGFMT_OHCODEC_YUV,
+
+    // Vulkan RGB_IDENTITY YCbCr samplers expose Cr/Y/Cb in R/G/B.
+    IMGFMT_OHCODEC_YUV_VK8,
+    IMGFMT_OHCODEC_YUV_VK16,
 
     // Planar gray/alpha.
     IMGFMT_YAP8,

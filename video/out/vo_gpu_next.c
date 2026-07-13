@@ -555,6 +555,9 @@ static pl_tex hwdec_get_tex(struct priv *p, int n)
         struct pl_opengl_wrap_params par = {
             .width = ratex->params.w,
             .height = ratex->params.h,
+            .sampler_type = ratex->params.external_yuv
+                          ? PL_SAMPLER_EXTERNAL_YUV
+                          : PL_SAMPLER_NORMAL,
         };
 
         ra_gl_get_format(ratex->params.format, &par.iformat,
@@ -948,6 +951,32 @@ static void apply_crop(struct pl_frame *frame, struct mp_rect crop,
     }
 }
 
+static void set_colorspace_hint(struct priv *p, struct pl_color_space *hint)
+{
+    struct ra_swapchain *sw = p->ra_ctx->swapchain;
+    enum pl_alpha_mode alpha = PL_ALPHA_UNKNOWN;
+#if PL_API_VER >= 344
+    alpha = PL_ALPHA_NONE;
+#endif
+
+    struct mp_image_params params = {
+        .color = hint ? *hint : pl_color_space_srgb,
+        .repr = {
+            .sys = PL_COLOR_SYSTEM_RGB,
+            .levels = p->output_levels ? p->output_levels : PL_COLOR_LEVELS_FULL,
+            .alpha = p->ra_ctx->opts.want_alpha ? PL_ALPHA_INDEPENDENT : alpha,
+        },
+    };
+
+    if (sw->fns->set_color) {
+        sw->fns->set_color(sw, &params);
+        if (hint)
+            *hint = params.color;
+    } else {
+        pl_swapchain_colorspace_hint(p->sw, hint);
+    }
+}
+
 static void update_tm_viz(struct pl_color_map_params *params,
                           const struct pl_frame *target)
 {
@@ -1231,11 +1260,11 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
         if (p->icc_profile)
             hint = p->icc_profile->csp;
         if (!pass_colorspace)
-            pl_swapchain_colorspace_hint(p->sw, &hint);
+            set_colorspace_hint(p, &hint);
     } else if (!target_hint) {
         if (!hint.hdr.min_luma)
             hint.hdr.min_luma = target_csp.hdr.min_luma;
-        pl_swapchain_colorspace_hint(p->sw, NULL);
+        set_colorspace_hint(p, NULL);
     }
 
     struct pl_swapchain_frame swframe;
@@ -1262,6 +1291,8 @@ static bool draw_frame(struct vo *vo, struct vo_frame *frame)
     // Calculate target
     struct pl_frame target;
     pl_frame_from_swapchain(&target, &swframe);
+    if (target_hint && sw->fns->set_color)
+        target.color = hint;
     bool strict_sw_params = target_hint && !pass_colorspace && p->next_opts->target_hint_strict;
     apply_target_options(p, &target, hint.hdr.min_luma, strict_sw_params);
     if (target.color.transfer == PL_COLOR_TRC_SRGB && frame->current &&

@@ -477,6 +477,20 @@ if features['android']
                      'video/out/vo_mediacodec_embed.c')
 endif
 
+features += {'ohos': get_option('ohos').enabled()}
+if features['ohos']
+    dependencies += [cc.find_library('ohaudio'),
+                     cc.find_library('native_media_codecbase'),
+                     cc.find_library('native_media_core'),
+                     cc.find_library('native_media_vdec'),
+                     cc.find_library('native_buffer'),
+                     cc.find_library('native_image'),
+                     cc.find_library('native_window')]
+    sources += files('audio/out/ao_ohaudio.c',
+                     'video/out/ohos_common.c',
+                     'video/out/hwdec/hwdec_ohcodec.c')
+endif
+
 uwp_opt = get_option('uwp').require(
     not get_option('cplayer'),
     error_message: 'cplayer is not false!',
@@ -996,7 +1010,7 @@ if features['sdl2-video']
 endif
 
 shaderc = dependency('shaderc', required:
-    get_option('shaderc').require(features['win32-desktop']))
+    get_option('shaderc').require(features['win32-desktop'] or features['ohos']))
 features += {'shaderc': shaderc.found()}
 if features['shaderc']
     dependencies += shaderc
@@ -1235,6 +1249,19 @@ if features['egl-android']
     sources += files('video/out/opengl/context_android.c')
 endif
 
+egl_ohos_opt = get_option('egl-ohos').require(
+    features['ohos'] and gl_allowed,
+    error_message: 'the OS is not HarmonyOS!',
+)
+egl_ohos = cc.find_library('EGL', required: egl_ohos_opt)
+features += {'egl-ohos': egl_ohos.found()}
+if features['egl-ohos']
+    dependencies += egl_ohos
+    features += {'gl': true}
+    sources += files('video/out/opengl/context_ohos.c',
+                     'video/out/hwdec/hwdec_ohcodec_gl.c')
+endif
+
 egl_drm = get_option('egl-drm').require(
     features['drm'] and features['egl'] and features['gbm'] and gl_allowed,
     error_message: 'either drm, egl, or gbm could not be found!',
@@ -1275,7 +1302,7 @@ if plain_gl.allowed()
     features += {'gl': true}
 endif
 
-if features['egl'] or features['egl-android'] or features['egl-angle-win32']
+if features['egl'] or features['egl-android'] or features['egl-angle-win32'] or features['egl-ohos']
     sources += files('video/out/opengl/egl_helpers.c')
 endif
 
@@ -1328,6 +1355,11 @@ endif
 
 if features['vulkan'] and features['x11']
      sources += files('video/out/vulkan/context_xlib.c')
+endif
+
+if features['vulkan'] and features['ohos']
+     sources += files('video/out/vulkan/context_ohos.c',
+                      'video/out/hwdec/hwdec_ohcodec_pl.c')
 endif
 
 features += {'vk-khr-display': vulkan.type_name() == 'internal' or
@@ -1786,7 +1818,7 @@ client_api_version = major + '.' + minor + '.0'
 libmpv = library('mpv', sources, dependencies: dependencies, gnu_symbol_visibility: 'hidden',
                  include_directories: incdir_public,
                  link_args: cc.get_supported_link_arguments(['-Wl,-Bsymbolic']),
-                 version: client_api_version, install: get_option('libmpv'),
+                 install: get_option('libmpv'),
                  build_by_default: get_option('libmpv'))
 
 
